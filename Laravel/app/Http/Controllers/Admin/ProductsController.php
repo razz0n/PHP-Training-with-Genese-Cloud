@@ -6,6 +6,10 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Product;
 use App\Models\Category;
+use Intervention\Image\Facades\Image;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
+
 
 class ProductsController extends Controller
 {
@@ -17,7 +21,7 @@ class ProductsController extends Controller
     public function index()
     {
         $products = Product::latest()->get();
-        return view('admin.products.index',['products' => $products]);
+        return view('admin.products.index', ['products' => $products] );
     }
 
     /**
@@ -28,7 +32,7 @@ class ProductsController extends Controller
     public function create()
     {
         $categories = Category::all();
-        return view('admin.products.create',compact(['categories']));
+        return view('admin.products.create', compact('categories'));
     }
 
     /**
@@ -39,21 +43,42 @@ class ProductsController extends Controller
      */
     public function store(Request $request)
     {
+        // using authorize helper function to check user authorization
+        // $this->authorize('create', Product::class);
+        
+        // return $request;
         $validated = $request->validate([
-            'product_name' => 'required|max:255',
+            'product_name' => 'required|max:255|unique:products',
             'product_desc' => 'required',
-            'price'=> 'required',
-            'category_id'=>'required|integer|min:0'
-        ]);
-        $product = new Product; 
+            'price' => 'required',
+            'category_id' => 'required|integer|min:1',
+        ],
+        [
+            'required' => ':attribute is required',
+            'product_name.required' => 'Product Name is required. Please input it.'
+        ]
+        );
+        $product = new Product;
         $product->product_name = $request->input('product_name');
         $product->product_desc = $request->input('product_desc');
         $product->price = $request->input('price');
         $product->category_id = $request->input('category_id');
-        if($product->save()){
-            return redirect()->route('product_list');
+        $product->user_id = Auth::id();
+        if ($request->hasFile('image_upload')) {
+            // uploading image to images folder
+            $name = $request->file('image_upload')->getClientOriginalName();
+            $request->file('image_upload')->storeAs('public/images', $name);
+            // croping the image and saving it to thumbnail folder inside images folder
+            // $image_resize = Image::make(storage_path('app/public/images/'.$name));
+            // $image_resize->resize(550, 750);
+            // $image_resize->save(storage_path('app/public/images/thumbnail/'.$name));
+            image_crop($name, 550, 750);
+            $product->image = $name;
         }
-        else{
+        // return $product;
+        if($product->save()){
+            return redirect()->route('admin.products.index');
+        }else {
             return redirect()->back();
         }
     }
@@ -78,7 +103,7 @@ class ProductsController extends Controller
     public function edit(Product $product)
     {
         $categories = Category::all();
-        return view('admin.products.edit',compact(['product','categories']));
+        return view('admin.products.edit', compact(['product', 'categories']));
     }
 
     /**
@@ -87,10 +112,54 @@ class ProductsController extends Controller
      * @param  \Illuminate\Http\Request  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
-     */
-    public function update(Request $request, $id)
+     */ 
+    public function update(Request $request, Product $product)
     {
-        //
+        // using Gate::allows function to check user authorization
+        // if (! Gate::allows('update-product', $product)) {
+        //     abort(403);
+        // }
+
+        // using Gate::authorize function to check user authorization
+        // Gate::authorize('update-product', $product);
+        
+        // using authorize helper function to check user authorization
+        $this->authorize('update', $product);
+        // return $request;
+        $validated = $request->validate([
+            'product_name' => 'required|max:255',
+            'product_desc' => 'required',
+            'price' => 'required',
+            'category_id' => 'required|integer|min:1',
+        ],
+        [
+            'required' => ':attribute is required',
+            'product_name.required' => 'Product Name is required. Please input it.'
+        ]
+        );
+        $product = new Product;
+        $product->product_name = $request->input('product_name');
+        $product->product_desc = $request->input('product_desc');
+        $product->price = $request->input('price');
+        $product->category_id = $request->input('category_id');
+        if ($request->hasFile('image_upload')) {
+            // uploading image to images folder
+            $name = $request->file('image_upload')->getClientOriginalName();
+            $request->file('image_upload')->storeAs('public/images', $name);
+            // croping the image and saving it to thumbnail folder inside images folder
+            // $image_resize = Image::make(storage_path('app/public/images/'.$name));
+            // $image_resize->resize(550, 750);
+            // $image_resize->save(storage_path('app/public/images/thumbnail/'.$name));
+            image_crop($name, 550, 750);
+            $product->image = $name;
+        }
+        // return $product;
+        if($product->save()){
+            return redirect()->route('admin.products.index');
+        }else {
+            return redirect()->back();
+        }
+        
     }
 
     /**

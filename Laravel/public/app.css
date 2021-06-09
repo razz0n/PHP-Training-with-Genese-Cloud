@@ -1,4 +1,4 @@
-body{
-    max-width: 900px;
+.container {
+    width: 900px;
     margin: 0 auto;
 }
